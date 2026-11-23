@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>SOLARA COVE — open-world crime in a sun-soaked cove city</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a1420;
+    font-family: "Arial Black", "Segoe UI", Arial, sans-serif; color: #fff; }
+  #game-canvas { position: fixed; inset: 0; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    text-shadow: 2px 2px 0 rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.6); }
+  .panel { background: rgba(8, 18, 30, .72); border: 1px solid rgba(255, 210, 63, .45);
+    border-radius: 6px; padding: 8px 10px; backdrop-filter: blur(2px); }
+  /* ---- top row ---- */
+  #mission-panel { position: absolute; top: 12px; left: 12px; width: 330px; }
+  #mission-panel .job-no { color: #ffd23f; font-size: 12px; letter-spacing: 2px; }
+  #mission-panel .job-title { font-size: 19px; color: #fff; line-height: 1.15; }
+  #mission-panel .job-stage { font-size: 12px; color: #8fd8ff; margin-top: 2px; }
+  #mission-panel .job-objective { font-size: 13px; color: #ffe9a8; margin-top: 4px; }
+  #mission-panel .job-dist { font-size: 12px; color: #7dff9a; }
+  #mission-panel .job-list { font-size: 11px; color: #b9c6d4; margin-top: 5px; line-height: 1.5; }
+  #mission-panel .job-list .done { color: #7dff9a; text-decoration: line-through; }
+  #mission-panel .job-list .current { color: #ffd23f; }
+  #district-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 22px; letter-spacing: 3px; color: #fff; text-align: center; }
+  #district-banner small { display: block; font-size: 11px; letter-spacing: 2px; color: #ffd23f; }
+  #stats-panel { position: absolute; top: 12px; right: 12px; width: 250px; text-align: right; }
+  #cash { font-size: 24px; color: #7dff9a; }
+  #respect { font-size: 12px; color: #ffd23f; letter-spacing: 1px; }
+  #clock { font-size: 13px; color: #fff; }
+  #radio-ticker { font-size: 12px; color: #ff9de2; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #stars { font-size: 30px; letter-spacing: 4px; margin-top: 2px; color: #ffd23f; }
+  #stars .lit { color: #ffd23f; }
+  #stars .dim { color: rgba(255,255,255,.22); }
+  /* ---- left: police dispatch ---- */
+  #dispatch-panel { position: absolute; top: 262px; left: 12px; width: 250px; }
+  #dispatch-panel h3 { font-size: 12px; color: #ff6b6b; letter-spacing: 2px; margin-bottom: 4px; }
+  #dispatch-list { font-size: 12px; line-height: 1.7; color: #dfe9f5; }
+  #dispatch-list .unit-air { color: #8fd8ff; }
+  #dispatch-list .unit-roadblock { color: #ffb347; }
+  /* ---- bottom left: minimap + weapons ---- */
+  #minimap-wrap { position: absolute; left: 12px; bottom: 12px; width: 220px; }
+  #minimap { width: 220px; height: 220px; border-radius: 50%;
+    border: 3px solid rgba(255, 210, 63, .8); background: rgba(6, 14, 24, .8); display: block; }
+  #weapons { display: flex; gap: 6px; margin-top: 8px; }
+  .weapon-slot { flex: 1; text-align: center; font-size: 11px; padding: 5px 2px;
+    background: rgba(8,18,30,.72); border: 1px solid rgba(255,255,255,.25); border-radius: 4px; }
+  .weapon-slot.active { border-color: #ffd23f; color: #ffd23f; }
+  #health-row { margin-top: 6px; font-size: 12px; }
+  .bar { height: 10px; background: rgba(255,255,255,.18); border-radius: 5px; overflow: hidden; margin-top: 2px; }
+  .bar > div { height: 100%; background: #7dff9a; }
+  #armor-bar > div { background: #8fd8ff; }
+  /* ---- bottom right: speed ---- */
+  #drive-panel { position: absolute; right: 12px; bottom: 12px; width: 210px; text-align: right; }
+  #speed { font-size: 56px; line-height: 1; color: #fff; }
+  #speed small { font-size: 14px; color: #ffd23f; }
+  #vehicle-name { font-size: 13px; color: #ffe9a8; }
+  #vehicle-cond { font-size: 11px; color: #b9c6d4; margin-top: 2px; }
+  #vehicle-cond .bar > div { background: #ffb347; }
+  /* ---- bottom center: dialogue + crew ---- */
+  #dialogue-box { position: absolute; left: 50%; bottom: 118px; transform: translateX(-50%);
+    width: 560px; max-width: 60vw; text-align: center; font-size: 15px; line-height: 1.45;
+    color: #fff; background: rgba(8,18,30,.78); border: 1px solid rgba(143,216,255,.5);
+    border-radius: 6px; padding: 10px 14px; }
+  #dialogue-box .speaker { color: #ffd23f; font-size: 12px; letter-spacing: 2px; display: block; }
+  #crew-bar { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%);
+    display: flex; gap: 8px; }
+  .crew-chip { width: 150px; text-align: center; font-size: 11px; padding: 6px 4px;
+    background: rgba(8,18,30,.72); border: 1px solid rgba(255,255,255,.3); border-radius: 5px; }
+  .crew-chip.ready { border-color: #7dff9a; }
+  .crew-chip .key { color: #ffd23f; }
+  .crew-chip .cd { color: #8fd8ff; }
+  #controls-legend { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+    font-size: 11px; color: rgba(255,255,255,.75); letter-spacing: .5px; white-space: nowrap; }
+  #toast { position: absolute; top: 96px; left: 50%; transform: translateX(-50%);
+    font-size: 16px; color: #7dff9a; background: rgba(8,18,30,.8); padding: 8px 16px;
+    border-radius: 6px; border: 1px solid #7dff9a; display: none; }
+  #objective-arrow { position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; color: #ffd23f; }
+  /* ---- overlays ---- */
+  .overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center;
+    justify-content: center; background: rgba(4, 10, 18, .82); pointer-events: auto; }
+  .overlay.hidden { display: none; }
+  .menu-card { width: 640px; max-width: 92vw; max-height: 92vh; overflow-y: auto;
+    background: linear-gradient(160deg, #12283d, #0a1420 60%); border: 2px solid #ffd23f;
+    border-radius: 10px; padding: 28px 32px; text-align: center; }
+  .menu-card h1 { font-size: 52px; letter-spacing: 4px; color: #ffd23f; line-height: 1; }
+  .menu-card h1 span { color: #fff; }
+  .menu-card h2 { font-size: 15px; letter-spacing: 3px; color: #8fd8ff; margin-top: 6px; }
+  .menu-card p { font-size: 14px; line-height: 1.6; color: #dfe9f5; margin-top: 12px; text-align: left; }
+  .menu-card .jobs-preview { text-align: left; font-size: 13px; color: #ffe9a8; line-height: 1.8; margin-top: 10px; }
+  .menu-card button { pointer-events: auto; cursor: pointer; margin-top: 18px;
+    font-family: inherit; font-size: 18px; letter-spacing: 2px; color: #0a1420;
+    background: #ffd23f; border: none; border-radius: 6px; padding: 12px 34px; }
+  .menu-card button.secondary { background: #8fd8ff; font-size: 15px; padding: 10px 22px; margin-left: 10px; }
+  .menu-card .keys { font-size: 12px; color: #b9c6d4; line-height: 1.9; margin-top: 14px; text-align: left; }
+  .menu-card .keys b { color: #ffd23f; }
+  #loading-note { font-size: 13px; color: #8fd8ff; margin-top: 10px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+<div id="hud">
+  <div id="mission-panel" class="panel">
+    <div class="job-no" id="job-no">JOB 1 / 8 — STORY</div>
+    <div class="job-title" id="job-title">First Light</div>
+    <div class="job-stage" id="job-stage">Stage 1 of 2</div>
+    <div class="job-objective" id="job-objective">Pick up the package at Marina Bay.</div>
+    <div class="job-dist" id="job-dist">— m</div>
+    <div class="job-list" id="job-list"></div>
+  </div>
+  <div id="district-banner">PALM COURT<small>SOLARA COVE &middot; SUN-COAST</small></div>
+  <div id="stats-panel" class="panel">
+    <div id="cash">$1,200</div>
+    <div id="respect">RESPECT: RUNNER &middot; 0 XP</div>
+    <div id="clock">DAY 1 &middot; 09:00</div>
+    <div id="radio-ticker">SOLARA FM 88.1 &mdash; Golden Hour Drive</div>
+    <div id="stars"><span class="dim">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>
+  </div>
+  <div id="dispatch-panel" class="panel">
+    <h3>SOLARA PD &mdash; DISPATCH</h3>
+    <div id="dispatch-list">All units clear. No active calls.</div>
+  </div>
+  <div id="minimap-wrap">
+    <canvas id="minimap" width="220" height="220"></canvas>
+    <div id="weapons">
+      <div class="weapon-slot active" id="slot-1">1 &middot; FISTS</div>
+      <div class="weapon-slot" id="slot-2">2 &middot; PISTOL</div>
+      <div class="weapon-slot" id="slot-3">3 &middot; SMG</div>
+    </div>
+    <div id="health-row">HEALTH<div class="bar"><div id="health-fill" style="width:100%"></div></div>
+      ARMOR<div class="bar" id="armor-bar"><div id="armor-fill" style="width:0%"></div></div></div>
+  </div>
+  <div id="drive-panel">
+    <div id="speed">0 <small>KM/H</small></div>
+    <div id="vehicle-name">ON FOOT</div>
+    <div id="vehicle-cond">CONDITION<div class="bar"><div id="cond-fill" style="width:100%"></div></div></div>
+  </div>
+  <div id="dialogue-box"><span class="speaker">MARA</span><span id="dialogue-text">Back in Solara Cove. One last run and I am out — that's what I keep telling myself.</span></div>
+  <div id="crew-bar">
+    <div class="crew-chip ready" id="crew-dax"><span class="key">[Z]</span> DAX &middot; NITRO<br><span class="cd">READY</span></div>
+    <div class="crew-chip ready" id="crew-iris"><span class="key">[X]</span> IRIS &middot; GHOST<br><span class="cd">READY</span></div>
+    <div class="crew-chip ready" id="crew-bram"><span class="key">[C]</span> BRAM &middot; BULWARK<br><span class="cd">READY</span></div>
+  </div>
+  <div id="controls-legend">WASD drive / walk &middot; E steal &amp; enter car &middot; CLICK shoot &middot; SHIFT sprint &middot; SPACE handbrake &middot; Z/X/C crew &middot; R radio &middot; P save &middot; ESC pause</div>
+  <div id="toast"></div>
+  <div id="objective-arrow"></div>
+</div>
+
+<div id="start-screen" class="overlay">
+  <div class="menu-card">
+    <h1>SOLARA <span>COVE</span></h1>
+    <h2>OPEN-WORLD CRIME IN A SUN-SOAKED COVE CITY &middot; 8 STORY JOBS &middot; SOLARA PD DISPATCH WITH AIR ONE &middot; CREW ABILITIES &middot; RADIO &middot; SAVES</h2>
+    <p>You are <b>Mara Voss</b>, a wheelwoman who swore she was done. Solara Cove disagrees.
+    Eight jobs stand between you and the sunrise ferry: steal cars, outrun Solara PD,
+    dodge Air One's spotlight, and keep your crew — Dax, Iris and Bram — alive long enough
+    to spend the money. The whole cove is yours: drive it, walk it, take what you need.</p>
+    <div class="jobs-preview">
+      1 First Light &middot; 2 Hot Wheels &middot; 3 The Cannery Run &middot; 4 Static &middot;
+      5 Payday at the Yard &middot; 6 Air One &middot; 7 The Longshoreman &middot; 8 Solara Sunrise
+    </div>
+    <div class="keys">
+      <b>WASD</b> drive / walk &nbsp; <b>Mouse</b> look &nbsp; <b>E</b> steal &amp; enter car &nbsp;
+      <b>Click</b> shoot &nbsp; <b>1/2/3</b> weapons &nbsp; <b>Shift</b> sprint &nbsp; <b>Space</b> handbrake<br>
+      <b>Z</b> Dax nitro &nbsp; <b>X</b> Iris ghost (drops the cops) &nbsp; <b>C</b> Bram bulwark (armor) &nbsp;
+      <b>R</b> radio station &nbsp; <b>P</b> save game &nbsp; <b>Esc</b> pause
+    </div>
+    <button id="start-button">START THE RUN</button>
+    <button id="continue-button" class="secondary" style="display:none">CONTINUE SAVE</button>
+    <div id="loading-note">Loading the cove&hellip;</div>
+  </div>
+</div>
+
+<div id="pause-screen" class="overlay hidden">
+  <div class="menu-card">
+    <h1>PAUSED</h1>
+    <p style="text-align:center">The cove waits. Solara PD does not — wanted level keeps cooling while paused.</p>
+    <button id="resume-button">RESUME</button>
+    <button id="save-button" class="secondary">SAVE GAME</button>
+    <button id="restart-button" class="secondary">RESTART RUN</button>
+  </div>
+</div>
+
+<div id="gameover-screen" class="overlay hidden">
+  <div class="menu-card">
+    <h1>BUSTED</h1>
+    <p style="text-align:center" id="gameover-text">Solara PD took you in. The cove keeps your cash — half of it, anyway.</p>
+    <button id="retry-button">TRY AGAIN</button>
+  </div>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
